@@ -4,6 +4,11 @@
 #include "driver/ledc.h"
 #include "encoder.h"
 #include "motor_driver.h"
+#include "odometry.c"
+#include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
 
 // пины энкодэров !все сломается при включении bluetooth в спящем режиме!
 #define ENC_A1 36 
@@ -40,19 +45,41 @@ driver_t drv = {
     }
 };
 
-encoder_t enc_right = {.in1=ENC_A1, .in2=ENC_A2};
-encoder_t enc_left = {.in1=ENC_B1, .in2=ENC_B2};
+int64_t enc_left_count, enc_right_count;
+encoder_t enc_right = {.in1=ENC_A1, .in2=ENC_A2, .counter=&enc_right_count};
+encoder_t enc_left = {.in1=ENC_B1, .in2=ENC_B2, .counter=&enc_left_count};
+
+robot_odometry_t robot = {
+    .angle = 0,
+    .x = 0,
+    .y = 0,
+    .encoder_tick_per_rot = 300,
+    .weel_d = 39,
+    .wheelbase_width = 93
+};
+
+void vTask_update_pos(void* params){
+    const TickType_t delay = 100 / portTICK_PERIOD_MS;
+    while(true){
+        static int64_t enc_left_count_prev, enc_right_count_prev;
+        update_pos(&robot, enc_left_count-enc_left_count_prev, enc_right_count-enc_right_count_prev);
+        enc_left_count_prev = enc_left_count;
+        enc_right_count_prev = enc_right_count;
+        vTaskDelay(delay);
+    }
+}
 
 void setup() {
     init_encoder(&enc_right);
     init_encoder(&enc_left);
     init_driver(&drv);
-
-    set_speed(&drv, 100, -100);
+    xTaskCreate(vTask_update_pos, "calc_odometry", 1<<16, NULL, tskIDLE_PRIORITY, NULL);
+    set_speed(&drv, 0, 40);
 }
 
+
 void loop() {
-    // printf("%d\t\t%d\n", (int)enc_left.counter, (int)enc_right.counter);
+    printf("%d\t\t%d\t%f\t%f\t%f\n", (int)enc_left_count, (int)enc_right_count, robot.x, robot.y, robot.angle*57.2957795131);
 }
 
 

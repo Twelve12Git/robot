@@ -2,7 +2,7 @@
 
 void enc_interrupt_handler(encoder_t* enc){
     enc->state = (enc->state << 2) | (gpio_get_level(enc->in1)<<1 | gpio_get_level(enc->in2));
-    enc->counter += (((enc->state&0x8) >> 3) != ((enc->state&0x2) >> 1)) ? ((((enc->state&0x2)>>1) != (enc->state&0x1))?1:-1):0;
+    *(enc->counter) += (((enc->state&0x8) >> 3) != ((enc->state&0x2) >> 1)) ? ((((enc->state&0x2)>>1) != (enc->state&0x1))?1:-1):0;
 }
 
 esp_err_t init_encoder(encoder_t* enc){
